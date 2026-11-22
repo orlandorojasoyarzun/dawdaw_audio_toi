@@ -28,6 +28,37 @@ export function App() {
     return () => removeEventListener("resize", fit);
   }, []);
 
+  // Phase 1 test: hold Z to play middle C through the engine.
+  useEffect(() => {
+    const { send } = window.dawdaw.engine;
+    let held = false;
+
+    const press = (event: KeyboardEvent) => {
+      if (event.code !== "KeyZ" || event.repeat || held) return;
+      held = true;
+      send("noteOn 60");
+    };
+    const release = (event: KeyboardEvent) => {
+      if (event.code !== "KeyZ" || !held) return;
+      held = false;
+      send("noteOff");
+    };
+    const releaseOnBlur = () => {
+      if (!held) return;
+      held = false;
+      send("noteOff");
+    };
+
+    addEventListener("keydown", press);
+    addEventListener("keyup", release);
+    addEventListener("blur", releaseOnBlur);
+    return () => {
+      removeEventListener("keydown", press);
+      removeEventListener("keyup", release);
+      removeEventListener("blur", releaseOnBlur);
+    };
+  }, []);
+
   return (
     <main className="screen">
       <canvas ref={canvasRef} width={SCREEN_W} height={SCREEN_H} />
