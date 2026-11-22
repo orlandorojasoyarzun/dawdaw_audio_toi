@@ -1,0 +1,20 @@
+# Node
+node_modules/
+dist/
+out/
+*.log
+
+# Engine (CMake)
+engine/build/
+build/
+CMakeUserPresets.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local env
+.env
+.env.*
