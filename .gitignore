@@ -15,6 +15,9 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Visual references (third-party material, not redistributed)
+docs/reference/
+
 # Local env
 .env
 .env.*

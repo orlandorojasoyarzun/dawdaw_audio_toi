@@ -3,13 +3,15 @@ import { join } from "node:path";
 
 function createWindow(): void {
   const win = new BrowserWindow({
-    width: 1200,
-    height: 760,
-    minWidth: 800,
-    minHeight: 500,
+    // Content size is 2x the 640x360 logical screen.
+    width: 1280,
+    height: 720,
+    useContentSize: true,
+    minWidth: 640,
+    minHeight: 360,
     show: false,
     title: "dawdaw",
-    backgroundColor: "#16161a",
+    backgroundColor: "#1f1f1f",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
