@@ -10,25 +10,38 @@ namespace te = tracktion::engine;
 
 namespace
 {
-void printDeviceInfo (te::Engine& engine)
+// One line: the buffer we chose and the total output latency the driver reports.
+// On CoreAudio the reported latency follows 2 * buffer + a fixed part, so it already
+// includes the buffer; the two numbers must not be added together.
+std::string latencySummary (juce::AudioIODevice& device)
 {
-    auto* device = engine.getDeviceManager().deviceManager.getCurrentAudioDevice();
-    if (device == nullptr)
-        return;
-
-    const auto toMs = [rate = device->getCurrentSampleRate()] (int samples)
+    const auto toMs = [rate = device.getCurrentSampleRate()] (int samples)
     {
         return 1000.0 * samples / rate;
     };
 
-    const int bufferSamples = device->getCurrentBufferSizeSamples();
-    const int driverSamples = device->getOutputLatencyInSamples();
+    const int bufferSamples = device.getCurrentBufferSizeSamples();
+    const int outputSamples = device.getOutputLatencyInSamples();
 
-    std::cout << "device " << device->getName() << " (" << device->getTypeName() << ")\n"
-              << "rate " << device->getCurrentSampleRate() << " Hz\n"
-              << "buffer " << bufferSamples << " samples = " << toMs (bufferSamples) << " ms\n"
-              << "driver " << driverSamples << " samples = " << toMs (driverSamples)
-              << " ms (reported by the driver, on top of the buffer)\n";
+    std::ostringstream out;
+    out << "buffer " << bufferSamples << " samples = " << toMs (bufferSamples) << " ms, "
+        << "output latency " << outputSamples << " samples = " << toMs (outputSamples) << " ms";
+    return out.str();
+}
+
+void printDeviceInfo (juce::AudioIODevice& device)
+{
+    std::cout << "device " << device.getName() << " (" << device.getTypeName() << ")\n"
+              << "rate " << device.getCurrentSampleRate() << " Hz\n"
+              << "latency " << latencySummary (device) << "\n";
+}
+
+// Returns an error message, or an empty string on success.
+juce::String setBufferSize (juce::AudioDeviceManager& audioDevices, int samples)
+{
+    auto setup = audioDevices.getAudioDeviceSetup();
+    setup.bufferSize = samples;
+    return audioDevices.setAudioDeviceSetup (setup, true);
 }
 } // namespace
 
@@ -52,7 +65,7 @@ int main()
     ToneGenerator tone;
     audioDevices.addAudioCallback (&tone);
 
-    printDeviceInfo (engine);
+    printDeviceInfo (*audioDevices.getCurrentAudioDevice());
     std::cout << "ready\n" << std::flush;
 
     std::string line;
@@ -76,6 +89,24 @@ int main()
         {
             tone.noteOff();
             std::cout << "ok\n";
+        }
+        else if (command == "buffer")
+        {
+            int samples = 0;
+            in >> samples;
+
+            if (samples < 32 || samples > 4096)
+            {
+                std::cout << "error buffer must be between 32 and 4096 samples\n";
+            }
+            else if (const auto error = setBufferSize (audioDevices, samples); error.isNotEmpty())
+            {
+                std::cout << "error " << error << "\n";
+            }
+            else
+            {
+                std::cout << "ok " << latencySummary (*audioDevices.getCurrentAudioDevice()) << "\n";
+            }
         }
         else if (command == "quit")
         {
