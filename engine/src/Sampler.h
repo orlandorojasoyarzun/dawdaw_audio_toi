@@ -48,17 +48,17 @@ public:
     // Safe to call from any thread: messages wait in a queue until the audio thread takes them.
     void noteOn (int note, int velocity)
     {
-        midi.addMessageToQueue (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (velocity)));
+        enqueue (juce::MidiMessage::noteOn (1, note, static_cast<juce::uint8> (velocity)));
     }
 
     void noteOff (int note)
     {
-        midi.addMessageToQueue (juce::MidiMessage::noteOff (1, note));
+        enqueue (juce::MidiMessage::noteOff (1, note));
     }
 
     void allNotesOff()
     {
-        midi.addMessageToQueue (juce::MidiMessage::allNotesOff (1));
+        enqueue (juce::MidiMessage::allNotesOff (1));
     }
 
     void audioDeviceAboutToStart (juce::AudioIODevice* device) override
@@ -93,6 +93,14 @@ public:
     }
 
 private:
+    // The collector places each message inside the next audio block using its time stamp,
+    // so it must be set (in seconds, same clock the collector uses).
+    void enqueue (juce::MidiMessage message)
+    {
+        message.setTimeStamp (juce::Time::getMillisecondCounterHiRes() * 0.001);
+        midi.addMessageToQueue (message);
+    }
+
     static constexpr int numVoices = 16;
     static constexpr int rootNote = 60;
     static constexpr double attackSeconds = 0.002;
