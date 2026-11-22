@@ -18,6 +18,9 @@ Thumbs.db
 # Visual references (third-party material, not redistributed)
 docs/reference/
 
+# Audio samples used while developing (not redistributed)
+dev-samples/
+
 # Local env
 .env
 .env.*
