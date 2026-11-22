@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld("dawdaw", {
   },
   engine: {
     send: (command: string): void => ipcRenderer.send("engine:send", command),
+    openSample: (): Promise<void> => ipcRenderer.invoke("engine:open-sample"),
   },
 });

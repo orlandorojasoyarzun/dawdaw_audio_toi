@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 
+import { installKeyboard } from "./keyboard.ts";
 import { Framebuffer } from "./screen/gfx.ts";
 import { drawSampleEditor } from "./screen/sampleEditor.ts";
 import { SCREEN_H, SCREEN_W } from "./screen/theme.ts";
@@ -28,36 +29,7 @@ export function App() {
     return () => removeEventListener("resize", fit);
   }, []);
 
-  // Phase 1 test: hold Z to play middle C through the engine.
-  useEffect(() => {
-    const { send } = window.dawdaw.engine;
-    let held = false;
-
-    const press = (event: KeyboardEvent) => {
-      if (event.code !== "KeyZ" || event.repeat || held) return;
-      held = true;
-      send("noteOn 60");
-    };
-    const release = (event: KeyboardEvent) => {
-      if (event.code !== "KeyZ" || !held) return;
-      held = false;
-      send("noteOff");
-    };
-    const releaseOnBlur = () => {
-      if (!held) return;
-      held = false;
-      send("noteOff");
-    };
-
-    addEventListener("keydown", press);
-    addEventListener("keyup", release);
-    addEventListener("blur", releaseOnBlur);
-    return () => {
-      removeEventListener("keydown", press);
-      removeEventListener("keyup", release);
-      removeEventListener("blur", releaseOnBlur);
-    };
-  }, []);
+  useEffect(() => installKeyboard(window.dawdaw.engine), []);
 
   return (
     <main className="screen">

@@ -2,7 +2,8 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 
 // The only commands the renderer is allowed to forward to the engine.
-const ALLOWED_COMMAND = /^(noteOn( \d{1,3})?|noteOff|buffer \d{2,4})$/;
+// "load" is deliberately missing: only the main process may tell the engine which file to read.
+const ALLOWED_COMMAND = /^(noteOn \d{1,3}( \d{1,3})?|noteOff( \d{1,3})?|buffer \d{2,4})$/;
 
 /** Runs the C++ audio engine as a child process and talks to it in text lines over stdio. */
 export class EngineProcess {
@@ -29,7 +30,7 @@ export class EngineProcess {
     });
     child.stderr.on("data", (data) => console.error(`[engine] ${String(data).trimEnd()}`));
 
-    // Writing to a dead engine raises EPIPE; send() already guards against it.
+    // Writing to a dead engine raises EPIPE; write() already guards against it.
     child.stdin.on("error", () => {});
     child.on("error", (err) => console.error(`[engine] failed to start: ${err.message}`));
     child.on("exit", (code, signal) => {
@@ -39,11 +40,16 @@ export class EngineProcess {
     });
   }
 
-  /** Drops the command silently if the engine is not ready yet or the command is not allowed. */
+  /** For commands that come from the renderer. Anything not on the allow list is dropped. */
   send(command: unknown): void {
-    if (!this.ready || !this.child) return;
     if (typeof command !== "string" || !ALLOWED_COMMAND.test(command)) return;
-    this.child.stdin.write(`${command}\n`);
+    this.write(command);
+  }
+
+  /** Asks the engine to load an audio file. Only call this with a path the user picked. */
+  load(path: string): void {
+    if (/[\r\n]/.test(path)) return; // a newline would smuggle in a second command
+    this.write(`load ${path}`);
   }
 
   stop(): void {
@@ -51,5 +57,11 @@ export class EngineProcess {
     if (!child) return;
     child.stdin.write("quit\n");
     setTimeout(() => child.kill(), 1000).unref();
+  }
+
+  // Drops the line silently if the engine is not ready yet.
+  private write(line: string): void {
+    if (!this.ready || !this.child) return;
+    this.child.stdin.write(`${line}\n`);
   }
 }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from "electron";
 import { join } from "node:path";
 
 import { EngineProcess } from "./engine";
@@ -47,6 +47,20 @@ void app.whenReady().then(() => {
 
   // Fire-and-forget (send, not invoke): nothing waits for a reply, so no extra round trip.
   ipcMain.on("engine:send", (_event, command: unknown) => engine.send(command));
+
+  // The file picker opens here, in the main process, so the renderer never supplies a path.
+  ipcMain.handle("engine:open-sample", async (event) => {
+    const parent = BrowserWindow.fromWebContents(event.sender);
+    const options: OpenDialogOptions = {
+      title: "Open sample",
+      properties: ["openFile"],
+      filters: [{ name: "Audio", extensions: ["wav", "aif", "aiff", "flac", "mp3", "ogg"] }],
+    };
+    const result = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options);
+
+    const path = result.filePaths[0];
+    if (!result.canceled && path) engine.load(path);
+  });
 
   createWindow();
 
