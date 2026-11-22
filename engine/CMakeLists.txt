@@ -39,7 +39,9 @@ target_link_libraries(dawdaw_engine PRIVATE
     tracktion::tracktion_core
     tracktion::tracktion_engine
     tracktion::tracktion_graph
+    juce::juce_audio_basics
     juce::juce_audio_devices
+    juce::juce_audio_formats
     juce::juce_audio_processors
     juce::juce_audio_utils
     juce::juce_recommended_config_flags

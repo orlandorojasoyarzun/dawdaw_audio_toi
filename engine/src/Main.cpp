@@ -1,6 +1,6 @@
 #include <tracktion_engine/tracktion_engine.h>
 
-#include "ToneGenerator.h"
+#include "Sampler.h"
 
 #include <iostream>
 #include <sstream>
@@ -43,10 +43,22 @@ juce::String setBufferSize (juce::AudioDeviceManager& audioDevices, int samples)
     setup.bufferSize = samples;
     return audioDevices.setAudioDeviceSetup (setup, true);
 }
+
+// Reads an optional integer argument, e.g. the "60" in "noteOn 60". Keeps `value` if absent.
+bool readOptionalInt (std::istringstream& in, int& value)
+{
+    in >> std::ws;
+    if (in.eof())
+        return true;
+    return static_cast<bool> (in >> value);
+}
 } // namespace
 
-// Commands arrive as one text line each on stdin:  noteOn <midi note>,  noteOff,  quit
-// Every command is answered with one line on stdout: "ok" or "error <reason>".
+// Commands arrive as one text line each on stdin:
+//   load <path to an audio file>
+//   noteOn <note 0-127> [velocity 1-127]      noteOff [note]   (no note = release everything)
+//   buffer <samples>                          quit
+// Every command is answered with one line on stdout: "ok ..." or "error <reason>".
 int main()
 {
     // Starts JUCE's message system; the audio device layer needs it on macOS.
@@ -62,8 +74,8 @@ int main()
         return 1;
     }
 
-    ToneGenerator tone;
-    audioDevices.addAudioCallback (&tone);
+    Sampler sampler;
+    audioDevices.addAudioCallback (&sampler);
 
     printDeviceInfo (*audioDevices.getCurrentAudioDevice());
     std::cout << "ready\n" << std::flush;
@@ -78,17 +90,46 @@ int main()
         if (command.empty())
             continue;
 
-        if (command == "noteOn")
+        if (command == "load")
         {
-            int note = 69; // A4 unless told otherwise
-            in >> note;
-            tone.noteOn (juce::jlimit (0, 127, note));
-            std::cout << "ok\n";
+            std::string path;
+            std::getline (in >> std::ws, path); // the rest of the line, spaces included
+
+            juce::String description;
+            if (const auto error = sampler.load (juce::File (path), description); error.isNotEmpty())
+                std::cout << "error " << error << "\n";
+            else
+                std::cout << "ok loaded " << description << "\n";
+        }
+        else if (command == "noteOn")
+        {
+            int note = 60;
+            int velocity = 100;
+            if (! readOptionalInt (in, note) || ! readOptionalInt (in, velocity))
+            {
+                std::cout << "error noteOn expects numbers\n";
+            }
+            else
+            {
+                sampler.noteOn (juce::jlimit (0, 127, note), juce::jlimit (1, 127, velocity));
+                std::cout << "ok\n";
+            }
         }
         else if (command == "noteOff")
         {
-            tone.noteOff();
-            std::cout << "ok\n";
+            int note = -1;
+            if (! readOptionalInt (in, note))
+            {
+                std::cout << "error noteOff expects a number\n";
+            }
+            else
+            {
+                if (note < 0)
+                    sampler.allNotesOff();
+                else
+                    sampler.noteOff (juce::jlimit (0, 127, note));
+                std::cout << "ok\n";
+            }
         }
         else if (command == "buffer")
         {
@@ -121,8 +162,8 @@ int main()
         std::cout << std::flush;
     }
 
-    tone.noteOff();
-    juce::Thread::sleep (300); // let the fade-out finish before removing the callback
-    audioDevices.removeAudioCallback (&tone);
+    sampler.allNotesOff();
+    juce::Thread::sleep (300); // let the release tails finish before removing the callback
+    audioDevices.removeAudioCallback (&sampler);
     return 0;
 }
